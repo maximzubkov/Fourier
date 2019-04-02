@@ -14,7 +14,7 @@ using namespace std;
 
 
 // Реализуте пропущенные методы
-// в качестве Т будет использоваться std::complex<float> // <double> // <long double>
+// в качестве Т будет использоваться std::complex<float> // <double> // <double>
 namespace FFT {
     // Возвращает корень степени degree из 1
 
@@ -45,7 +45,7 @@ namespace FFT {
                     tmp += (T)data[j];
                     // tmp_vect.push_back((T)1);
                 } else {
-                    tmp += data[j] * GetRoot<T>((double)N / (j * i));
+                    tmp += (T)(data[j] * GetRoot<T>((1.0) * N / (j * i)));
                     // tmp_vect.push_back(GetRoot<T>((double)N / (j * i)));
                 }
             }
@@ -143,8 +143,8 @@ namespace FFT {
         std::vector<T> y_1(FastFourierTransform(a_1));
 
         for (int i = 0; i < size / 2; i++){
-            res[i] = y_0[i] + GetRoot<T>((1.0) * size / i) * y_1[i];
-            res[i + size / 2] = y_0[i] - GetRoot<T>((1.0) * size / i) * y_1[i];
+            res[i] = (T)(y_0[i] + GetRoot<T>((1.0) * size / i) * y_1[i]);
+            res[i + size / 2] = (T)(y_0[i] - GetRoot<T>((1.0) * size / i) * y_1[i]);
         }
 
         return res;
@@ -284,7 +284,10 @@ public:
         return Polynomial(FFT::FastInverseFourierTransform(inv_res));
     }
 
-    Polynomial operator^(size_t pow);
+    Polynomial operator^(size_t pow){
+        *this ^= pow;
+        return *this;
+    }
     
 
     // Возведение в степень pow с помощью комбинации FFT и индийского возведения в степень
@@ -321,12 +324,18 @@ public:
     friend std::ostream& operator<< (std::ostream &out, const Polynomial& poly){
         std::vector<T> coef(poly.GetCoeffs());
         int i;
-        out << coef[0] << " + ";
-        for (i = 1; i != static_cast<int>(coef.size()) - 1; i++){
-            if (coef[i].real() * coef[i].real() + coef[i].imag() * coef[i].imag() > 1e-4)
-            out << coef[i] << "x^" << i << " + ";
+        if (coef.size() > 1){
+            out << coef[0] << " + ";
+            for (i = 1; i != static_cast<int>(coef.size()) - 1; i++){
+                if (coef[i].real() * coef[i].real() + coef[i].imag() * coef[i].imag() > 1e-4)
+                out << coef[i] << "x^" << i << " + ";
+            }
+            out << coef[i] << "x^" << i << endl;
+        } else {
+            if (coef.size() == 1){
+                out << coef[0];
+            }
         }
-        out << coef[i] << "x^" << i << endl;
         return out;
     }
     // И еще один, унарный минус
@@ -355,11 +364,123 @@ namespace SubstringMatching {
     // Метод принимает две строки str и pattern, возвращает индексов,
     // указывающих начала подстрок str, совпадающих с pattern
     // Можете считать, что str и pattern состоят из символов 0 и 1
-    std::vector<size_t> FindSubstrings(const std::string& str, const std::string& pattern);
+    std::vector<size_t> FindSubstrings(const std::string& str, const std::string& pattern){
+        std::vector<std::complex<double> > p;
+        std::vector<std::complex<double> > t;
+        size_t S = 0;
+        size_t H = 0;
+        size_t tmp = 0;
+        std::vector<size_t> res;
+        for (const auto & elem: pattern){
+            tmp = (elem - '\0');
+            p.insert(p.begin(), std::complex<double> {(double)tmp, 0});
+            S += tmp * tmp;
+        }  
+        
+        size_t m = p.size();
+
+        for (const auto & elem: str){
+            tmp = (elem - '\0');
+            if (t.size() < m){
+                H += tmp * tmp;
+            }
+            t.push_back(std::complex<double> {(double)tmp, 0});
+        }  
+
+        size_t n = t.size();
+
+        std::vector<std::complex<double>> c(
+                                                Polynomial<std::complex<double>>(
+                                                    Polynomial<std::complex<double>>(t) * 
+                                                    Polynomial<std::complex<double>>(p)
+                                                ).GetCoeffs()
+                                            );
+        int64_t B = S - 2 * (int64_t)c[m-1].real() + H;
+        if (B == 0){
+                res.push_back(0);
+        }
+        for (int i = 1; i <= n - m; i++){
+            B = B + 2 * ((int64_t)c[m + i - 2].real() - (int64_t)c[m + i - 1].real()) - ((int64_t)t[i - 1].real() * (int64_t)t[i - 1].real()) + ((int64_t)t[m + i - 1].real() * (int64_t)t[m + i - 1].real());
+            if (B == 0){
+                res.push_back(i);
+            }
+        }  
+        std::cout << "\n";
+        return res;
+    }
 
     // Аналогично предыдущему, но теперь pattern может содержать символ '?', на месте которого
     // можно поставить любой символ алфавита
-    std::vector<size_t> FindMatches(const std::string& str, const std::string& pattern);
+    std::vector<size_t> FindMatches(const std::string& str, const std::string& pattern){
+        std::vector<std::complex<double> > p;
+        std::vector<std::complex<double> > t;
+        std::vector<std::complex<double> > p2;
+        std::vector<std::complex<double> > t2;
+        std::vector<std::complex<double> > p3;
+        std::vector<std::complex<double> > t3;
+        size_t tmp = 0;
+        std::vector<size_t> res;
+        for (const auto & elem: pattern){
+            if (elem != '*'){
+                tmp = (elem - '\0');
+                p.insert(p.begin(), std::complex<double> {(double)tmp, 0});
+                p2.insert(p2.begin(), std::complex<double> {(double)(tmp * tmp), 0});
+                p3.insert(p3.begin(), std::complex<double> {(double)(tmp * tmp * tmp), 0});
+            } else {
+                p.insert(p.begin(), std::complex<double> {0, 0});
+                p2.insert(p2.begin(), std::complex<double> {0, 0});
+                p3.insert(p3.begin(), std::complex<double> {0, 0});
+            }
+        }  
+        
+        size_t m = p.size();
+
+        for (const auto & elem: str){
+            if (elem != '*'){
+                tmp = (elem - '\0');
+                t.push_back(std::complex<double> {(double)tmp, 0});
+                t2.push_back(std::complex<double> {(double)(tmp * tmp), 0});
+                t3.push_back(std::complex<double> {(double)(tmp * tmp * tmp), 0});
+            } else {
+                t.push_back(std::complex<double> {0, 0});
+                t2.push_back(std::complex<double> {0, 0});
+                t3.push_back(std::complex<double> {0, 0});
+            }
+        }  
+
+        size_t n = t.size();
+        std::vector<std::complex<double>> a(
+                                                Polynomial<std::complex<double>>(
+                                                    Polynomial<std::complex<double>>(t) * 
+                                                    Polynomial<std::complex<double>>(p3)
+                                                ).GetCoeffs()
+                                            );
+
+        std::vector<std::complex<double>> b(
+                                                Polynomial<std::complex<double>>(
+                                                    Polynomial<std::complex<double>>(t2) * 
+                                                    Polynomial<std::complex<double>>(p2)
+                                                ).GetCoeffs()
+                                            );
+        
+        std::vector<std::complex<double>> c(
+                                                Polynomial<std::complex<double>>(
+                                                    Polynomial<std::complex<double>>(t3) * 
+                                                    Polynomial<std::complex<double>>(p)
+                                                ).GetCoeffs()
+                                            );
+
+        if ((int64_t)a[m - 1].real() - 2 * (int64_t)b[m - 1].real() + (int64_t)c[m - 1].real() == 0){
+                res.push_back(0);
+        }
+        for (int i = 1; i <= n - m; i++){
+            if ((int64_t)(a[m - 1 + i].real() - 2 * b[m - 1 + i].real() + c[m - 1 + i].real()) == 0){
+                res.push_back(i);
+            }
+        }  
+        std::cout << "\n";
+        return res;
+    }
 
 } // namespace SubstringMatcher
 
